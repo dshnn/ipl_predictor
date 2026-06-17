@@ -14,9 +14,11 @@ st.set_page_config(
 # ── load model ───────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
+   
     return joblib.load("ipl_model.pkl")
 
 model = load_model()
+
 st.sidebar.success(f"Loaded model with {len(model.feature_names_in_)} features")
 
 # ── load lookup tables from your dataset ────────────────────────────────────
@@ -68,25 +70,25 @@ lookup["avg_stadium"] = {
 # ── constants ────────────────────────────────────────────────────────────────
 feature_cols = list(model.feature_names_in_)
 
-TEAM1_OHE_COLS = sorted(
-    list(
-        set(
-            c.replace("team1_", "").strip()
-            for c in feature_cols
-            if c.startswith("team1_")
-        )
-    )
-)
+# Build display names (stripped) from feature columns
+TEAMS = sorted(set(
+    c.replace("team1_", "").strip()
+    for c in feature_cols
+    if c.startswith("team1_")
+))
 
-TEAM2_OHE_COLS = sorted(
-    list(
-        set(
-            c.replace("team2_", "").strip()
-            for c in feature_cols
-            if c.startswith("team2_")
-        )
-    )
-)
+# But keep raw OHE suffixes (with spaces) for encoding
+TEAM1_OHE_COLS = [
+    c.replace("team1_", "")
+    for c in feature_cols
+    if c.startswith("team1_")
+]
+
+TEAM2_OHE_COLS = [
+    c.replace("team2_", "")
+    for c in feature_cols
+    if c.startswith("team2_")
+]
 
 VENUE_OHE_COLS = sorted(
     [
@@ -125,6 +127,8 @@ def build_feature_vector(
     team2_wr_at_venue = lookup["team_wr_venue"].get((team2, venue), 0.5)
     avg_score_of_stadium = lookup["avg_stadium"].get(venue, 165)
     
+
+    
     # base features in exact column order
     row = {
         "target_runs": target_runs,
@@ -153,17 +157,18 @@ def build_feature_vector(
         "t1_won_toss": t1_won_toss,
     }
 
-    # one-hot encode team1
+      # one-hot encode team1 — match raw column name exactly
     for col in TEAM1_OHE_COLS:
-        row[f"team1_{col}"] = 1 if col.strip() == team1 else 0
+        # col already includes the space if it existed in training
+        row[f"team1_{col}"] = 1 if col.strip() == team1.strip() else 0
 
     # one-hot encode team2
     for col in TEAM2_OHE_COLS:
-        row[f"team2_{col}"] = 1 if col.strip() == team2 else 0
+        row[f"team2_{col}"] = 1 if col.strip() == team2.strip() else 0
 
-    # one-hot encode venue
-    for col in VENUE_OHE_COLS:
-        row[f"venue_{col}"] = 1 if col == venue else 0
+        # one-hot encode venue
+        for col in VENUE_OHE_COLS:
+            row[f"venue_{col}"] = 1 if col == venue else 0
 
     
     
